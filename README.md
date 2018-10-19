@@ -38,7 +38,8 @@ optional arguments:
 python crawl.py  # from root/
 ```
 
-## Other use cases
+
+#### Other use cases
 
 To scrape companies listed **between page 10 and 20**:
 
@@ -50,4 +51,12 @@ To **only** scrape companies listed **on page 15**:
 
 ```shell
 python crawl.py -s 15 --single-page
+```
+
+#### Output
+
+JSON data is downloaded automatically into `/output`. Run `json_to_csv.py` to get the data in a csv file.
+
+```shell
+python json_to_csv.py  # csv stored into `/output`
 ```
