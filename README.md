@@ -10,7 +10,7 @@
 ├── output                      # /output files directory
 │   ├── companies.csv
 │   └── companies.json
-├── utils                       # /aux functions
+├── utils                       # /aux functions directory
 │   └── functions.py
 ├── README.md
 ├── crawl.py                    # main script
