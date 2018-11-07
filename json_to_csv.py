@@ -14,7 +14,6 @@ with open(fullpath) as input_file:
         data.append(json.loads(line))
 
 df = pd.DataFrame(data)
-df.sort_values(by=['rank'], inplace=True)
 # df.reset_index(inplace=True)
 # df.drop('index', axis=1, inplace=True)
 df.to_csv(input_file_path.replace('json', 'csv'), sep=';', encoding='utf-8', index=False)

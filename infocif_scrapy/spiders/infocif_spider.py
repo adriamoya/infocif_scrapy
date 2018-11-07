@@ -7,15 +7,15 @@ from scrapy.http.request import Request
 from ..items import InfocifItem
 from utils.functions import numberize
 
-_url = 'https://www.infocif.es/ranking/ventas-empresas/espana?pagina='
+_url = 'http://www.infocif.es/ficha-empresa/'
 
 
 class InfocifSpider(scrapy.Spider):
 
-    def __init__(self, start_page=1, end_page=596, single_page=False):
+    def __init__(self, nombre_url_list, single_page=False):
         start_urls_list = []
-        for page in range(start_page, end_page+1):
-            start_urls_list.append('%s%s' % (_url, page))
+        for nombre_url in nombre_url_list:
+            start_urls_list.append('%s%s' % (_url, nombre_url))
             if single_page:
                 break
         print(start_urls_list)
@@ -33,95 +33,72 @@ class InfocifSpider(scrapy.Spider):
 
         self.logger.info('parsing...')
 
-        if response.status == 200:
+        if response.status == 200 and response.url != 'http://www.infocif.es/':
 
-            table = response.xpath('//table[@id="tablaranking"]')
+            company = InfocifItem()
 
-            if table:
-                keys = [th for th in table.xpath('.//th/text()').extract()]
-                ventas_years = [
-                    numberize(key) for key in keys if 'ventas' in key.lower()
-                ]
-                result_years = [
-                    numberize(key) for key in keys if 'resultado' in key.lower()
-                ]
-                ebitda_years = [
-                    numberize(key) for key in keys if 'ebitda' in key.lower()
-                ]
+            company = {
+                'name': None,
+                'cif': None,
+                'antig': None,
+                'cp': None,
+                'empleados': None,
+                'domicilio': None,
+                'municipio': None,
+                # 'provincia': None,
+                'owner': None,
+                'rank_ventas': None,
+                'sector': None,
+                'telefono': None
+            }
 
-                for row in table.xpath('./tbody//tr'):
+            # Initialize variables
+            name = None
+            cif = None
+            antig = None
+            cp = None
+            empleados = None
+            domicilio = None
+            municipio = None
+            # provincia = None
+            owner = None
+            rank_ventas = None
+            sector = None
+            telefono = None
 
-                    company = InfocifItem()
+            company['url'] = response.url
 
-                    # Initialize variables
-                    name = None
-                    ventas = []
-                    resultado = None
-                    ebitda = None
-                    empleados = None
-                    sector = None
-                    municipio = None
-                    provincia = None
+            name = response.xpath('//h1[contains(@class, "title")]/text()').extract()[0].strip().lower()
+            if name:
+                company['name'] = name
 
-                    # Parse list view
-                    rank        = numberize(row.xpath('.//td[1]/text()').extract()[0].split()[0])
-                    name        = row.xpath('.//td[2]/a/text()').extract()[0].strip().lower()
-                    url_detail  = row.xpath('.//td[2]/a/@href').extract()[0]
-                    ventas.append(numberize(row.xpath('.//td[3]/text()').extract()[0].strip()))
-                    ventas.append(numberize(row.xpath('.//td[4]/text()').extract()[0].strip()))
-                    resultado   = numberize(row.xpath('.//td[5]/text()').extract()[0].strip())
-                    ebitda      = numberize(row.xpath('.//td[6]/text()').extract()[0].strip())
-                    empleados   = numberize(row.xpath('.//td[7]/text()').extract()[0].strip())
-                    sector      = row.xpath('.//td[8]/span/@title').extract()[0].strip()
-                    try:
-                        municipio   = row.xpath('.//td[9]/text()').extract()[0].strip().lower()
-                    except:
-                        pass
-                    try:
-                        provincia   = re.findall('(?!\()\w+(?=\))', row.xpath('.//td[9]/text()').extract()[1])[0].strip().lower()
-                    except:
-                        pass
-
-                    company = {
-                        'rank': rank,
-                        'name': name,
-                        'empleados': empleados,
-                        'municipio': municipio,
-                        'provincia': provincia,
-                        'sector': sector,
-                        'ebitda_%s' % ebitda_years[0]: ebitda,
-                        'resultado_%s' % result_years[0]: resultado,
-                        'ventas_%s' % ventas_years[0]: ventas[0],
-                        'ventas_%s' % ventas_years[1]: ventas[1]
-                    }
-
-                    request = scrapy.Request(
-                        url_detail,
-                        callback=self.parse_detail,
-                        dont_filter=True)
-                    request.meta['item'] = company
-
-                    yield request
-
-    def parse_detail(self, response):
-
-        # Initialize variables
-        cp = None
-        cif = None
-        antig = None
-        owner = None
-
-        company = response.meta['item']
-
-        if response.status == 200:
+            rank_ventas = numberize(response.xpath('//div[contains(@class, "hoverred")]/span/text()').extract()[0].strip())
+            if rank_ventas:
+                company['rank_ventas'] = rank_ventas
 
             for panel in response.xpath('//div[contains(@id, "fe-informacion-izq")]'):
                 for strong in panel.xpath('.//strong'):
                     s = strong.xpath('./text()').extract()[0].strip().lower()
                     if 'cif' in s:
-                        cif = strong.xpath('./following-sibling::h2/text()').extract()[0].strip()
+                        cif = strong.xpath('./following-sibling::h2/text()')
+                        if cif:
+                            cif = cif.extract()[0].strip()
+                        else:
+                            cif = None
                     if 'antigüedad' in s:
                         antig = numberize(strong.xpath('./following-sibling::p/text()').extract()[0].split()[0])
+                    if 'teléfono' in s:
+                        telefono = numberize(strong.xpath('./following-sibling::p/text()').extract()[0].split()[0])
+                    if 'empleados' in s:
+                        empleados = numberize(strong.xpath('./following-sibling::p/text()').extract()[0].split()[0])
+                    if 'sector' in s:
+                        sector = ' '.join(strong.xpath('./following-sibling::p/text()').extract()[0].split()).lower()
+                        if sector == '-':
+                            sector = None
+                    if 'domicilio' in s:
+                        domicilio = ' '.join(strong.xpath('./following-sibling::p/text()').extract()[0].split()).lower()
+                        if domicilio == '-':
+                            domicilio = None
                     if 'cargos' in s:
                         owner = strong.xpath('./following-sibling::p/text()').extract()[0].strip()
                         owner = re.findall('.+?(?=\.)', owner)
@@ -133,14 +110,26 @@ class InfocifSpider(scrapy.Spider):
                             'ver más', '', owner,
                             flags=re.IGNORECASE).strip().lower()
                     if 'domicilio' in s:
-                        cp = strong.xpath('./following-sibling::p/text()').extract()[0].strip()
-                        cp = re.search('\d\d\d\d\d', cp)
-                        if cp:
-                            cp = cp.group(0)
+                        domicilio = ' '.join(strong.xpath('./following-sibling::p/text()').extract()[0].split()).lower()
+                        if domicilio == '-':
+                            domicilio = None
+                        # cp = strong.xpath('./following-sibling::p/text()').extract()[0].strip()
+                        if domicilio:
+                            cp = re.search('\d\d\d\d\d', domicilio)
+                            if cp:
+                                cp = cp.group(0)
+                            municipio = re.findall('(?<=\().+?(?=\))', domicilio)
+                            if municipio:
+                                municipio = municipio[-1]
 
             company['cif'] = cif
-            company['cp'] = cp
             company['antig'] = antig
+            company['cp'] = cp
+            company['domicilio'] = domicilio
+            company['empleados'] = empleados
+            company['municipio'] = municipio
             company['owner'] = owner
+            company['sector'] = sector
+            company['telefono'] = telefono
 
             yield company
