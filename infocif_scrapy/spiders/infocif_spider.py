@@ -158,12 +158,23 @@ class InfocifSpider(scrapy.Spider):
             miles = re.findall('(miles)', miles)
 
             year_list				= response.xpath('//th[contains(text(),"Cuenta de resultados")]')[0].xpath('./following-sibling::th/span/text()')
+
+            # CUENTAS
             ingresos_expl_list  	= response.xpath('//td[contains(text(),"Ingresos de expl")]/following-sibling::td/text()')
             amortizaciones_list 	= response.xpath('//td[contains(text(),"Amortiz")]/following-sibling::td/span/text()')
-
             resultado_expl_list 	= response.xpath('//td[contains(text(),"Resultado de explotaci")]/following-sibling::td')
-            total_activo_list 		= response.xpath('//td[contains(text(),"Total activo")]/following-sibling::td/text()')
+            resultado_neto_list 	= response.xpath('//td[contains(text(),"Resultado del ejercicio")]/following-sibling::td')
+
+            # BALANCE
+            activo_nocorr_list      = response.xpath('//td[contains(text(),"Activo no corriente")]/following-sibling::td/text()')
+            inmov_intang_list       = response.xpath('//td[contains(text(),"Inmovilizado intangible")]/following-sibling::td/text()')
+            inmov_material_list     = response.xpath('//td[contains(text(),"Inmovilizado material")]/following-sibling::td/text()')
+            activo_corr_list        = response.xpath('//td[contains(text(),"Activo corriente")]/following-sibling::td/text()')
+            existencias_list        = response.xpath('//td[contains(text(),"Existencias")]/following-sibling::td/text()')
+            activo_total_list 		= response.xpath('//td[contains(text(),"Total activo")]/following-sibling::td/text()')
             patrimonio_neto_list 	= response.xpath('//td[contains(text(),"Patrimonio neto")]/following-sibling::td/text()')
+            pasivo_nocorr_list  	= response.xpath('//td[contains(text(),"Pasivo no corriente")]/following-sibling::td/text()')
+            pasivo_corr_list    	= response.xpath('//td[contains(text(),"Pasivo corriente")]/following-sibling::td/text()')
             deudas_cp_list			= response.xpath('//td[contains(text(),"Deudas a corto plazo")]/following-sibling::td/text()')
             deudas_lp_list			= response.xpath('//td[contains(text(),"Deudas a largo plazo")]/following-sibling::td/text()')
             deudores_comerc_list 	= response.xpath('//td[contains(text(),"Deudores comerciales")]/following-sibling::td/text()')
@@ -172,6 +183,7 @@ class InfocifSpider(scrapy.Spider):
 
             if year_list:
 
+                balances = []
                 cuentas = []
 
                 # para cada ejercicio
@@ -182,6 +194,9 @@ class InfocifSpider(scrapy.Spider):
                     if miles:
 
                         self.logger.info('Cuentas de resultados en miles de euros ........................')
+
+                        ebitda = None
+                        pasivo_total = None
 
                         # cuenta de resultados
                         # --------------------------------------------------------
@@ -216,17 +231,69 @@ class InfocifSpider(scrapy.Spider):
                             else:
                                 resultado_expl = 0
 
+                        # resultado neto
+                        if resultado_neto_list[i].xpath('./span[contains(@class,"rojo")]'):
+                            # negativo
+                            resultado_neto = ''.join(re.findall('[0-9]',resultado_neto_list[i].xpath('./span/text()').extract()[0]))
+                            if resultado_neto:
+                                resultado_neto = float(resultado_neto)*(-1000)
+                            else:
+                                resultado_neto = 0
+                        else:
+                        # positivo
+                            resultado_neto = ''.join(re.findall('[0-9]',resultado_neto_list[i].xpath('./text()').extract()[0]))
+                            if resultado_neto:
+                                resultado_neto = float(resultado_neto)*(1000)
+                            else:
+                                resultado_neto = 0
+
                         # ebitda
                         ebitda = resultado_expl + amortizaciones
 
                         # balance
                         # --------------------------------------------------------
-                        # total activo
-                        total_activo = ''.join(re.findall('[0-9]',total_activo_list[i].extract()))
-                        if total_activo:
-                            total_activo = float(total_activo)*1000
+
+                        # activo no corriente
+                        activo_nocorr = ''.join(re.findall('[0-9]',activo_nocorr_list[i].extract()))
+                        if activo_nocorr:
+                            activo_nocorr = float(activo_nocorr)*1000
                         else:
-                            total_activo = 0
+                            activo_nocorr = 0
+
+                        # inmovilizado intangible
+                        inmov_intang = ''.join(re.findall('[0-9]',inmov_intang_list[i].extract()))
+                        if inmov_intang:
+                            inmov_intang = float(inmov_intang)*1000
+                        else:
+                            inmov_intang = 0
+
+                        # inmovilizado material
+                        inmov_material = ''.join(re.findall('[0-9]',inmov_material_list[i].extract()))
+                        if inmov_material:
+                            inmov_material = float(inmov_material)*1000
+                        else:
+                            inmov_material = 0
+
+                        # activo corriente
+                        activo_corr = ''.join(re.findall('[0-9]',activo_corr_list[i].extract()))
+                        if activo_corr:
+                            activo_corr = float(activo_corr)*1000
+                        else:
+                            activo_corr = 0
+
+                        # existencias
+                        existencias = ''.join(re.findall('[0-9]',existencias_list[i].extract()))
+                        if existencias:
+                            existencias = float(existencias)*1000
+                        else:
+                            existencias = 0
+
+                        # total activo
+                        activo_total = ''.join(re.findall('[0-9]',activo_total_list[i].extract()))
+                        if activo_total:
+                            activo_total = float(activo_total)*1000
+                        else:
+                            activo_total = 0
 
                         # patrimonio neto
                         patrimonio_neto = ''.join(re.findall('[0-9]',patrimonio_neto_list[i].extract()))
@@ -234,6 +301,22 @@ class InfocifSpider(scrapy.Spider):
                             patrimonio_neto = float(patrimonio_neto)*1000
                         else:
                             patrimonio_neto = 0
+
+                        # pasivo no corriente
+                        pasivo_nocorr = ''.join(re.findall('[0-9]',pasivo_nocorr_list[i].extract()))
+                        if pasivo_nocorr:
+                            pasivo_nocorr = float(pasivo_nocorr)*1000
+                        else:
+                            pasivo_nocorr = 0
+
+                        # pasivo corriente
+                        pasivo_corr = ''.join(re.findall('[0-9]',pasivo_corr_list[i].extract()))
+                        if pasivo_corr:
+                            pasivo_corr = float(pasivo_corr)*1000
+                        else:
+                            pasivo_corr = 0
+
+                        pasivo_total = pasivo_nocorr + pasivo_corr
 
                         # deudas a corto plazo
                         deudas_cp = ''.join(re.findall('[0-9]',deudas_cp_list[i].extract()))
@@ -291,7 +374,7 @@ class InfocifSpider(scrapy.Spider):
                         # --------------------------------------------------------
 
                         # total activo
-                        total_activo = float(''.join(re.findall('[0-9]', total_activo_list[i].extract())))
+                        activo_total = float(''.join(re.findall('[0-9]', activo_total_list[i].extract())))
 
                         # patrimonio neto
                         patrimonio_neto = float(''.join(re.findall('[0-9]', patrimonio_neto_list[i].extract())))
@@ -309,24 +392,40 @@ class InfocifSpider(scrapy.Spider):
                         acreedores_comerc 	= float(''.join(re.findall('[0-9]', acreedores_comerc_list[i].extract()))) # proveedores
 
 
+                    balance = {
+                        'year': year,
+                        'activo_nocorr': activo_nocorr,
+                        'inmov_intang': inmov_intang,
+                        'inmov_material': inmov_material,
+                        'activo_corr': activo_corr,
+                        'existencias': existencias,
+                        'pasivo_nocorr': pasivo_nocorr,
+                        'pasivo_corr': pasivo_corr,
+                        'deudas_lp': deudas_lp,
+                        'deudas_cp': deudas_cp,
+                        'deudas_total': deudas_cp + deudas_lp,
+                        'patrimonio_neto': patrimonio_neto,
+                        'pasivo_total': pasivo_total,
+                        'activo_total': activo_total,
+                        'clientes': deudores_comerc,
+                        'proveedores': acreedores_comerc
+                    }
+
                     cuenta = {
                         'year': year,
                         'ingresos_expl': ingresos_expl,
                         'amortizaciones': amortizaciones,
                         'resultado_expl': resultado_expl,
+                        'resultado_neto': resultado_neto
                         'ebitda': ebitda,
-                        'total_activo': total_activo,
-                        'patrimonio_neto': patrimonio_neto,
-                        'deudas_cp': deudas_cp,
-                        'deudas_lp': deudas_lp,
-                        'deudas_total': deudas_cp + deudas_lp,
-                        'clientes': deudores_comerc,
-                        'proveedores': acreedores_comerc
                         }
-                    self.logger.info(cuenta)
 
+                     # self.logger.info(cuenta)
+
+                    balances.append(balance)
                     cuentas.append(cuenta)
 
+                company['balance'] = balances
                 company['cuentas'] = cuentas
 
         except:
